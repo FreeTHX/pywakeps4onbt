@@ -7,3 +7,9 @@ Based on :
 - [Frank Zhao](https://eleccelerator.com/unpairing-a-dualshock-4-and-setting-a-new-bdaddr/) Article to get DS4 and PS4 BT Addr 
 
 The main objective is to include it into [Home Assistant](https://www.home-assistant.io/ "Home Assistant") components to provide a "Wake Ps4 On Bt" service.
+
+## Supported Devices
+The module tests the adapter support via a ```hci_read_local_version``` python implementation and read the ```manufacturer``` returned value (bytes[5:7])  
+Currently supported adapter :
+- Broadcom devices (```manufacturer = 15```) 
+- Raspberry 3 devices ( Broadcom too but specific ```hci_read_local_version``` returned value)
