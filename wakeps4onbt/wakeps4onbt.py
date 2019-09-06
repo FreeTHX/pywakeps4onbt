@@ -22,17 +22,14 @@ def hci_read_local_version_compid(adapter: int) -> int:
                                _bt.OGF_INFO_PARAM,
                                _bt.OCF_READ_LOCAL_VERSION,
                                _bt.EVT_CONN_COMPLETE,
-                               1000,
-                               bytes([0x00]))
+                               9)
         hci_sock.close()
-        if len(res) != 9:
-            # Ugly HACK for Raspberry Broadcom BCM43438
-            # which is compatible but does not provide the proper answer
-            # if res == b'\x12' this is a Raspberry with BCM 
-            if len(res) == 1 and res[0] == 18:
-                return 15
+        # Check first byte.
+        # See read_local_version_rp.status
+        # 0 if OK or ERRNO if an error has been raised 
+        if res[0]:
             # Invalid response
-            return 65535
+            return -1
             
         return int.from_bytes(res[5:7],byteorder='little', signed=False)
 
