@@ -10,6 +10,5 @@ The main objective is to include it into [Home Assistant](https://www.home-assis
 
 ## Supported Devices
 The module tests the adapter support via a ```hci_read_local_version``` python implementation and read the ```manufacturer``` returned value (bytes[5:7])  
-Currently supported adapter :
-- Broadcom devices (```manufacturer = 15```) 
-- Raspberry 3 devices ( Broadcom too but specific ```hci_read_local_version``` returned value)
+Currently supported adapters :
+- Broadcom devices (```manufacturer = 15```)
