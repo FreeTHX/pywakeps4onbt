@@ -187,18 +187,8 @@ def get_bt_addr():
         dev.attach_kernel_driver(0)
 
     # Get the DualShock BT Address
-    dsbt_address = format(msg[6], '02X') + ':' +
-                   format(msg[5], '02X') + ':' +
-                   format(msg[4], '02X') + ':' +
-                   format(msg[3], '02X') + ':' +
-                   format(msg[2], '02X') + ':' +
-                   format(msg[1], '02X')
+    dsbt_address = format(msg[6], '02X') + ':' + format(msg[5], '02X') + ':' +                 format(msg[4], '02X') + ':' + format(msg[3], '02X') + ':' +                 format(msg[2], '02X') + ':' + format(msg[1], '02X')
     # Get the Playstation 4 BT Address                  
-    ps4bt_address = format(msg[15], '02X') + ':' +
-                    format(msg[14], '02X') + ':' +
-                    format(msg[13], '02X') + ':' +
-                    format(msg[12], '02X') + ':' +
-                    format(msg[11], '02X') + ':' +
-                    format(msg[10], '02X')
+    ps4bt_address = format(msg[15], '02X') + ':' + format(msg[14], '02X') + ':'               + format(msg[13], '02X') + ':' + format(msg[12], '02X') + ':'               + format(msg[11], '02X') + ':' + format(msg[10], '02X')
  
     return {'dsbt_address':dsbt_address, 'ps4bt_address':ps4bt_address }
