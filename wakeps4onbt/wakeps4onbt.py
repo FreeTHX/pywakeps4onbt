@@ -1,5 +1,7 @@
 ADAPTER_SUFFIX = 'hci'
 ADAPTER_DEFAULT = 0
+IDVENDOR_SONY = [ 0x54c ]
+IDPRODUCT_DS4 = [ 0x05c4, 0x09cc]
 
 def get_devid_from_devname(adaptername) -> int:
     if isinstance(adaptername, int):
@@ -152,3 +154,51 @@ def send_magic_packet(adapter,
     write_local_bdaddr[compid](adapterdevid,original_bdaddr)
 
     return True
+
+def get_bt_addr():
+    import usb.core, usb.util
+
+    dev = None
+    for vendor in IDVENDOR_SONY:
+        for product in IDPRODUCT_DS4:
+            dev = usb.core.find(idVendor=vendor, idProduct=product )
+            if dev is not None:
+                break
+        if dev is not None:
+                break
+
+    # Sony DualShock 4 not found !
+    if dev is None:
+        return None
+    
+    # Following pyusb recommendation, we detach (if needed) and claim interface
+    # https://github.com/pyusb/pyusb/blob/master/docs/tutorial.rst
+    reattach = False
+    if dev.is_kernel_driver_active(0):
+        reattach = True
+        dev.detach_kernel_driver(0)
+    usb.util.claim_interface(dev, 0)
+
+    # Read PS4 et DS BT addresses with USB control transfer GET REPORT on 0x12'
+    msg = dev.ctrl_transfer(0xA1, 0x01, 0x0312, 0x0000, 0x0010)
+    # Clean disposal of device
+    usb.util.release_interface(dev,0)
+    if reattach:
+        dev.attach_kernel_driver(0)
+
+    # Get the DualShock BT Address
+    dsbt_address = format(msg[6], '02X') + ':' +
+                   format(msg[5], '02X') + ':' +
+                   format(msg[4], '02X') + ':' +
+                   format(msg[3], '02X') + ':' +
+                   format(msg[2], '02X') + ':' +
+                   format(msg[1], '02X')
+    # Get the Playstation 4 BT Address                  
+    ps4bt_address = format(msg[15], '02X') + ':' +
+                    format(msg[14], '02X') + ':' +
+                    format(msg[13], '02X') + ':' +
+                    format(msg[12], '02X') + ':' +
+                    format(msg[11], '02X') + ':' +
+                    format(msg[10], '02X')
+ 
+    return {'dsbt_address':dsbt_address, 'ps4bt_address':ps4bt_address }
