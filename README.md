@@ -12,3 +12,12 @@ The main objective is to include it into [Home Assistant](https://www.home-assis
 The module tests the adapter support via a ```hci_read_local_version``` python implementation and read the ```manufacturer``` returned value (bytes[5:7])  
 Currently supported adapters :
 - Broadcom devices (```manufacturer = 15```)
+
+## Get Bluetooth addresses over USB
+Plug the DualShock4 controler on your computer using micro USB cable.  
+Once ```pywakeps4onbt``` is installed, run the following command from a python shell:
+```python
+>>> import wakeps4onbt
+>>> wakeps4onbt.get_bt_addr()
+{'dsbt_address': '00:1F:E2:12:34:56', 'ps4bt_address': '90:CD:B6:12:34:56'}
+```
