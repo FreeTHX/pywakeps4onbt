@@ -1,8 +1,29 @@
+import struct
+import socket
+
 ADAPTER_SUFFIX = 'hci'
 ADAPTER_DEFAULT = 0
+# SONY IDVENDOR / IDPRODUCT
 IDVENDOR_SONY = [ 0x54c ]
 IDPRODUCT_DS4 = [ 0x05c4, 0x09cc]
+# HCI
+HCI_FILTER_SIZE = 14
+HCI_COMMAND_PKT = 0x01
+HCI_EVENT_PKT = 0x04
+EVT_CMD_COMPLETE = 0x0e
+EVT_CMD_STATUS = 0x0f
+# OCF and OGF opcode
+OGF_LINK_CTL = 0x01
+OGF_INFO_PARAM = 0x04
+OGF_VENDOR_CMD = 0x3f
+OCF_READ_LOCAL_VERSION = 0x0001
+OCF_CREATE_CONN = 0x0005
+OCF_READ_BD_ADDR = 0x0009
+OCF_BCM_CYS_WRITE_BD_ADDR = 0x0001
 
+#####################################
+## HCI functions
+#####################################
 def get_devid_from_devname(adaptername) -> int:
     if isinstance(adaptername, int):
         return adaptername
@@ -15,143 +36,144 @@ def get_devid_from_devname(adaptername) -> int:
         adapter = ADAPTER_DEFAULT    
     return adapter
 
-def hci_read_local_version_compid(adapter: int) -> int: 
-    import bluetooth._bluetooth as _bt
+def hci_open_dev(dev_id: int) -> int:
+    if dev_id < 0:
+        # ENODEV
+        return -1
+    # Create HCI socket
+    dd = socket.socket(socket.AF_BLUETOOTH, socket.SOCK_RAW, socket.BTPROTO_HCI)
+    # Manager Error ?
+    # if dd < 0:
+    #    return dd
+    # TODO ErrorMngment
+    dd.bind((dev_id,))
+    return dd
 
-    try:
-        hci_sock = _bt.hci_open_dev(adapter)
-        res = _bt.hci_send_req(hci_sock,
-                               _bt.OGF_INFO_PARAM,
-                               _bt.OCF_READ_LOCAL_VERSION,
-                               _bt.EVT_CONN_COMPLETE,
-                               9)
-        hci_sock.close()
-        # Check first byte.
-        # See read_local_version_rp.status
-        # 0 if OK or ERRNO if an error has been raised 
-        if res[0]:
-            # Invalid response
-            return -1
-            
-        return int.from_bytes(res[5:7],byteorder='little', signed=False)
+def hci_close_dev(bt_socket: socket.socket) -> None:
+    bt_socket.close()
 
-    except _bt.error as e:
-        raise BluetoothError(*e.args)
+# Return an uint16 opcode
+def cmd_opcode_pack(ogf: int, ocf: int) -> int:
+    return	((ocf & 0x03ff)|(ogf << 10))
 
-def read_local_bdaddr(adapter: int) -> str: 
-    import struct
-    import bluetooth._bluetooth as _bt
+# Feature Filter
+def get_features_filter(bt_socket: socket.socket) -> bytes:
+    return bt_socket.getsockopt( socket.SOL_HCI, socket.HCI_FILTER, HCI_FILTER_SIZE)
 
-    try:
-        hci_sock = _bt.hci_open_dev(adapter)
+def set_features_filter(bt_socket: socket.socket, opcode: int = 0) -> None:
+    typeMask   = 1 << HCI_EVENT_PKT
+    eventMask1 = (1 << EVT_CMD_COMPLETE) | (1 << EVT_CMD_STATUS)
+    eventMask2 = 0
+    filter = struct.pack("<LLLHH", typeMask, eventMask1, eventMask2, opcode, 0)
+    bt_socket.setsockopt( socket.SOL_HCI, socket.HCI_FILTER, filter)
 
-        old_filter = hci_sock.getsockopt( _bt.SOL_HCI, _bt.HCI_FILTER, 14)
-        flt = _bt.hci_filter_new()
-        opcode = _bt.cmd_opcode_pack(_bt.OGF_INFO_PARAM, _bt.OCF_READ_BD_ADDR)
-        _bt.hci_filter_set_ptype(flt, _bt.HCI_EVENT_PKT)
-        _bt.hci_filter_set_event(flt, _bt.EVT_CMD_COMPLETE)
-        _bt.hci_filter_set_opcode(flt, opcode)
-        hci_sock.setsockopt( _bt.SOL_HCI, _bt.HCI_FILTER, flt )
-
-        _bt.hci_send_cmd(hci_sock, _bt.OGF_INFO_PARAM, _bt.OCF_READ_BD_ADDR )
-        pkt = hci_sock.recv(255)
-        status,raw_bdaddr = struct.unpack("xxxxxxB6s", pkt)
-        assert status == 0
-
-        t = [ "%02X" % int(b) for b in raw_bdaddr ]
-        t.reverse()
-        bdaddr = ":".join(t)
-
-        # restore old filter
-        hci_sock.setsockopt( _bt.SOL_HCI, _bt.HCI_FILTER, old_filter )
-        hci_sock.close()
-        return bdaddr
-    except _bt.error as e:
-        raise BluetoothError(*e.args)
-
-# Only BCM ( raspberry and others) supported yet)
-def bcm_write_local_bdaddr(adapter: int, dsbtaddr: str) -> None:
-    import bluetooth._bluetooth as _bt
-
-    try:
-        # Open hci socket
-        hci_sock = _bt.hci_open_dev(adapter)
-
-        # Get bytes from bluetooth address
-        baddrtospoof = bytearray.fromhex(dsbtaddr.replace(":",""))
-        baddrtospoof.reverse()
-
-        # Send HCI request
-        cmd_pkt = bytes( baddrtospoof)
-
-        # BCM WRITE ADDR command
-        # https://github.com/pauloborges/bluez/blob/master/tools/bdaddr.c
-        _bt.hci_send_req(hci_sock,
-                         _bt.OGF_VENDOR_CMD,
-                         0x0001, #OCF_BCM_WRITE_BD_ADDR
-                         0x00000000,
-                         1000,
-                         cmd_pkt)
-
-        hci_sock.close()
-
-    except _bt.error as e:
-        raise BluetoothError(*e.args)
+def reset_features_filter(bt_socket: socket.socket, filter: bytes) -> None:
+    bt_socket.setsockopt( socket.SOL_HCI, socket.HCI_FILTER, filter)
 
 
-def hci_cc(adapter: int, ps4btaddr: str) -> None:
-    import bluetooth._bluetooth as _bt
+def hci_read_local_bdaddr(bt_socket: socket.socket) -> str: 
+    old_filter = get_features_filter(bt_socket)
+    opcode = cmd_opcode_pack(OGF_INFO_PARAM, OCF_READ_BD_ADDR)
+    set_features_filter(bt_socket, opcode)    
+    cmd = struct.pack("<BHB", HCI_COMMAND_PKT, opcode, 0)
+    bt_socket.send(cmd)
+    pkt = bt_socket.recv(255)
+    reset_features_filter( bt_socket, old_filter)
+    if len(pkt) != 13:
+        return None
+    status,raw_bdaddr = struct.unpack("<xxxxxxB6s", pkt)
+    if status != 0:
+        return None
+    t = [ "%02X" % int(b) for b in raw_bdaddr ]
+    t.reverse()
+    bdaddr = ":".join(t)
+    return bdaddr
 
-    try:
-        hci_sock = _bt.hci_open_dev(adapter)
+def hci_read_local_manufacturer(bt_socket: socket.socket) -> int:
+    old_filter = get_features_filter(bt_socket)
+    opcode = cmd_opcode_pack(OGF_INFO_PARAM, OCF_READ_LOCAL_VERSION)
+    set_features_filter(bt_socket, opcode)
+    cmd = struct.pack("<BHB", HCI_COMMAND_PKT, opcode, 0)
+    bt_socket.send(cmd)
+    pkt = bt_socket.recv(255)
+    reset_features_filter( bt_socket, old_filter)
+    if len(pkt) != 15:
+        return -1
+    status,manu = struct.unpack("<xxxxxxBxxxxHxx", pkt)
+    if status != 0:
+        return -1
+    return manu
 
-        # Get bytes from bluetooth address
-        baps4addr = bytearray.fromhex(ps4btaddr.replace(":",""))
-        baps4addr.reverse()
-        # HCI CONNECT
-        # BLUETOOTH SPECIFICATION Version 5.0 | Vol 2, Part E page 774
-        # https://github.com/pauloborges/bluez/blob/master/tools/hcitool.c => cmd_cc
-        # https://github.com/pauloborges/bluez/blob/master/lib/hci.c => hci_create_connection
-        cmd_pkt = bytes(baps4addr) + bytes([ # Target BTADDR on 6 bytes reverse order,
-                        0x18, 0xCC, # pkt_type HCI_DM1 | HCI_DM3 | HCI_DM5 | HCI_DH1 | HCI_DH3 | HCI_DH5
-                        0x02, # pscan_rep_mode
-                        0x00, # pscan_mode (reserved)
-                        0x00, 0x00, # clock_offset
-                        0x01]) # role_switch
+# Only BCM  and CYS( raspberry and others) supported yet)
+def bcm_cys_write_local_bdaddr(bt_socket: socket.socket, dsbtaddr: str) -> bool:
+    # prepare bt addr
+    baddrtospoof = bytearray.fromhex(dsbtaddr.replace(":",""))
+    baddrtospoof.reverse()
+    baddr_param = bytes(baddrtospoof)
+    bt_socket = hci_open_dev(0)
+    # get filter
+    old_filter = get_features_filter(bt_socket)
+    # set filter
+    opcode = cmd_opcode_pack(OGF_VENDOR_CMD, OCF_BCM_CYS_WRITE_BD_ADDR)
+    set_features_filter(bt_socket, opcode)
+    # send the cmd
+    cmd = struct.pack("<BHB6s", HCI_COMMAND_PKT, opcode, 6, baddr_param)
+    bt_socket.send(cmd)
+    pkt = bt_socket.recv(255)
+    # reset old filter
+    reset_features_filter( bt_socket, old_filter)
+    if len(pkt) != 7:
+        return False
+    t_status = struct.unpack("<xxxxxxB", pkt) 
+    if t_status[0] != 0:
+        return False
+    return True
 
-        # Send HCI request
-        _bt.hci_send_req(hci_sock,
-                        _bt.OGF_LINK_CTL,
-                        _bt.OCF_CREATE_CONN,
-                        _bt.EVT_CONN_COMPLETE,
-                        1000,
-                        cmd_pkt)
-        hci_sock.close()
-
-    except _bt.error as e:
-        raise BluetoothError(*e.args)
-
-
-write_local_bdaddr = { 15 : bcm_write_local_bdaddr}
+def hci_cc(bt_socket: socket.socket, ps4btaddr: str) -> None:
+    dstaddr = bytearray.fromhex(ps4btaddr.replace(":",""))
+    dstaddr.reverse()
+    dstaddr_param = bytes(dstaddr)
+    #           dst addr +  
+    cmd_param = dstaddr_param + bytes([
+        0x00, 0x00, # pkt_type (0x00,0x00 works fine)
+        0x02,       # pscan_rep_mode 
+        0x00,       # pscan_mode (reserved)
+        0x00, 0x00, # clock_offset
+        0x01])     # role_switch
+    old_filter = get_features_filter(bt_socket)
+    opcode = cmd_opcode_pack(OGF_LINK_CTL, OCF_CREATE_CONN)
+    set_features_filter(bt_socket, opcode)
+    cmd = struct.pack("<BHB13s", HCI_COMMAND_PKT, opcode, 13, cmd_param)
+    bt_socket.send(cmd)
+    # No need to read the feedback
+    reset_features_filter( bt_socket, old_filter)
+    return
+    
+write_local_bdaddr = { 
+    15  : bcm_cys_write_local_bdaddr,
+    305 : bcm_cys_write_local_bdaddr
+    }
 
 def send_magic_packet(adapter,
                       ps4_addr: str,
-                      ds4_addr: str) -> None:
+                      ds4_addr: str) -> bool:
 
     adapterdevid = get_devid_from_devname(adapter)
-    compid = hci_read_local_version_compid(adapterdevid)
-    if compid not in write_local_bdaddr:
+    manufacturer = hci_read_local_manufacturer(adapterdevid)
+    if manufacturer not in write_local_bdaddr:
         return False
 
+    bt_socket = hci_open_dev(adapterdevid)
     """Send magic packet to wake up a device."""
     # Get the original addr
-    original_bdaddr = read_local_bdaddr(adapterdevid)
+    original_bdaddr = hci_read_local_bdaddr(bt_socket)
     # Spoof the addr
-    write_local_bdaddr[compid](adapterdevid, ds4_addr)
+    write_local_bdaddr[manufacturer](bt_socket, ds4_addr)
     # connect to the Ps4 HCI CC
-    hci_cc(adapterdevid, ps4_addr)
+    hci_cc(bt_socket, ps4_addr)
     # Write back the original addr
-    write_local_bdaddr[compid](adapterdevid,original_bdaddr)
+    write_local_bdaddr[manufacturer](bt_socket,original_bdaddr)
+    hci_close_dev(bt_socket)
 
     return True
 

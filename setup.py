@@ -15,7 +15,7 @@ DESCRIPTION='A Python library to wakeup Ps4 on BlueTooth'
 URL='https://github.com/FreeTHX/pywakeps4onbt'
 AUTHOR='FreeTHX'
 AUTHOR_EMAIL='freethx.dev@gmail.com'
-REQUIRED = ['pybluez']
+REQUIRED = []
 
 here = path.abspath(path.dirname(__file__))
 # Get the long description from the README file
@@ -47,6 +47,10 @@ setup(
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
     ],
 
     keywords='wake ps4 on bt home assistant',
