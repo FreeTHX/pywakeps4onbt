@@ -36,7 +36,7 @@ def get_devid_from_devname(adaptername) -> int:
         adapter = ADAPTER_DEFAULT    
     return adapter
 
-def hci_open_dev(dev_id: int) -> int:
+def hci_open_dev(dev_id: int) -> socket.socket:
     if dev_id < 0:
         # ENODEV
         return -1
