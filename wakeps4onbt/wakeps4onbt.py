@@ -159,11 +159,10 @@ def send_magic_packet(adapter,
                       ds4_addr: str) -> bool:
 
     adapterdevid = get_devid_from_devname(adapter)
-    manufacturer = hci_read_local_manufacturer(adapterdevid)
+    bt_socket = hci_open_dev(adapterdevid)
+    manufacturer = hci_read_local_manufacturer(bt_socket)
     if manufacturer not in write_local_bdaddr:
         return False
-
-    bt_socket = hci_open_dev(adapterdevid)
     """Send magic packet to wake up a device."""
     # Get the original addr
     original_bdaddr = hci_read_local_bdaddr(bt_socket)
