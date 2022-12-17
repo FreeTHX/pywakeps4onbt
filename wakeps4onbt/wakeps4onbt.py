@@ -1,5 +1,6 @@
 import struct
 import socket
+import time
 
 ADAPTER_SUFFIX = 'hci'
 ADAPTER_DEFAULT = 0
@@ -156,7 +157,8 @@ write_local_bdaddr = {
 
 def send_magic_packet(adapter,
                       ps4_addr: str,
-                      ds4_addr: str) -> bool:
+                      ds4_addr: str,
+                      sleep: int = 1) -> bool:
 
     adapterdevid = get_devid_from_devname(adapter)
     bt_socket = hci_open_dev(adapterdevid)
@@ -171,6 +173,8 @@ def send_magic_packet(adapter,
     write_local_bdaddr[manufacturer](bt_socket, ds4_addr)
     # connect to the Ps4 HCI CC
     hci_cc(bt_socket, ps4_addr)
+    # Wait a short delay to let the connection be established before reseting the addr
+    time.sleep(sleep)
     # Write back the original addr
     write_local_bdaddr[manufacturer](bt_socket,original_bdaddr)
     hci_close_dev(bt_socket)
