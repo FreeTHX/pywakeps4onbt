@@ -4,6 +4,7 @@ import time
 
 ADAPTER_SUFFIX = 'hci'
 ADAPTER_DEFAULT = 0
+DEFAULT_SLEEP_AFTER_CC = 2
 # SONY IDVENDOR / IDPRODUCT
 IDVENDOR_SONY = [ 0x54c ]
 IDPRODUCT_DS4 = [ 0x05c4, 0x09cc]
@@ -158,7 +159,7 @@ write_local_bdaddr = {
 def send_magic_packet(adapter,
                       ps4_addr: str,
                       ds4_addr: str,
-                      sleep: int = 1) -> bool:
+                      sleep: int = DEFAULT_SLEEP_AFTER_CC) -> bool:
 
     adapterdevid = get_devid_from_devname(adapter)
     bt_socket = hci_open_dev(adapterdevid)
