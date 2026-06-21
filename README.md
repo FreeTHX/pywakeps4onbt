@@ -1,3 +1,6 @@
+[!WARNING]
+**This project is deprecated.** Please use [pywakepsx-on-bt](https://github.com/FreeTHX/pywakepsx-on-bt) instead.
+
 # PyWakePs4 On BlueTooth
 This is a simple Python library to switch on a ps4 using Bluetooth
 Based on :
