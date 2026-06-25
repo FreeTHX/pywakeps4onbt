@@ -9,7 +9,7 @@ DEFAULT_SLEEP_AFTER_CC = 2
 IDVENDOR_SONY = [ 0x54c ]
 IDPRODUCT_DS4 = [ 0x05c4, 0x09cc]
 # HCI
-HCI_FILTER_SIZE = 14
+HCI_FILTER_SIZE = 16
 HCI_COMMAND_PKT = 0x01
 HCI_EVENT_PKT = 0x04
 EVT_CMD_COMPLETE = 0x0e
@@ -66,7 +66,7 @@ def set_features_filter(bt_socket: socket.socket, opcode: int = 0) -> None:
     typeMask   = 1 << HCI_EVENT_PKT
     eventMask1 = (1 << EVT_CMD_COMPLETE) | (1 << EVT_CMD_STATUS)
     eventMask2 = 0
-    filter = struct.pack("<LLLHH", typeMask, eventMask1, eventMask2, opcode, 0)
+    filter = struct.pack("<LLLHHxx", typeMask, eventMask1, eventMask2, opcode, 0)
     bt_socket.setsockopt( socket.SOL_HCI, socket.HCI_FILTER, filter)
 
 def reset_features_filter(bt_socket: socket.socket, filter: bytes) -> None:
